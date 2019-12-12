@@ -11,6 +11,7 @@ class Game:
         self.currentCallAmount = 0
         self.players = []
         self.activePlayers = []
+        self.currentActivePlayerBets = {}
         for i in range(numOfPlayers):
             self.players.append(Player(i, initalChipCount))
 
@@ -34,22 +35,42 @@ class Game:
 
     def takeBets(self):
         for player in self.activePlayers:
-            play = self.queryPlay(currentCallAmount)
-            if play == 'C':
-                player.bet(currentCallAmount)
-                self.currentPot += currentCallAmount
-            elif play == 'R':
-                raiseAmount = self.queryRaise()
-                currentCallAmount += raiseAmount
-                player.bet(
-           else:
-                self.activePlayers.remove(player) 
-            currentot += player.bet
+            betAction = self.queryBetAction()
+            updateGameState(player, betAction)
+        while allBetsNotEqual():
+            for player in self.activePlayers:
+                betAction = self.queryBetAction()
+                updateGameState(player, betAction)
+        
+    def updateGameState(self, player, betAction):
+        if play == 'C':
+            player.bet(self.currentCallAmount)
+            self.currentPot += currentCallAmount
+            self.currentActivePlayerBets[player.number] = self.currentCallAmount 
+        elif play == 'R':
+            raiseAmount = self.queryRaise()
+            currentCallAmount += raiseAmount
+            player.bet(currentCallAmount)
+            self.currentActivePlayerBets[player.number] = self.currentCallAmount
+        elif: play == 'CH':
+            self.currentActivePlayerBets[player.number] = 0
+        else:
+            self.activePlayers.remove(player)
+            del self.currentActivePlayerBets[player.number]
 
-    def queryPlay(self):
-        play = input('Enter F to fold, C to call, or R to raise: ')
-        while(play != 'F' && play != 'C' && play != 'R'):
-            play = input('Enter F to fold, C to call, or R to raise: ')
+    def allBetsNotEqual():
+        if len(self.currentActivePlayerBets) == 1:
+            return false
+        bets = list(self.currentActivePlayerBets.values())
+        result = bets[0]
+        for bet in bets[1:]:
+            result = result ^ bet
+        return result != 0
+
+    def queryBetAction(self):
+        play = input('Enter F to fold, CH to check, C to call, or R to raise: ')
+        while(play != 'F' && play != 'C' && play != 'R' && play != 'CH'):
+            play = input('Enter F to fold, CH to check, C to call, or R to raise: ')
         return play
 
     def queryRaise(self);
@@ -66,7 +87,7 @@ class Game:
         for player in self.players:
             if player.chipCount > 0:
                 self.activePlayers.append(player)
-
+        self.currentActivePlayerBets = {}
 
 numOfPlayers = input('Enter number of players: ')
 initialChipCount = input('Enter player initial chip count: ')
