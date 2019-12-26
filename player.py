@@ -1,8 +1,8 @@
 class Player:
 
-    def __init__(self, number, chipCount):
+    def __init__(self, identifier, chipCount):
         self.hand = []
-        self.number = number
+        self.identifier = identifier 
         self.chipCount = chipCount 
 
     def setChipCount(self, amount):

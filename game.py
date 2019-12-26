@@ -1,95 +1,162 @@
-from deck import Deck
+from deck import generateDeck, drawCard
 from player import Player
+from engine import BettingEngine
 
 class Game:
 
-    def __init__(self, numOfPlayers, initalChipCount):
-        self.deck = Deck()
-        self.numOfPlayers = numOfPlayers
-        self.prizePool = numOfPlayers * initialChipCount
-        self.currentPot = 0
-        self.currentCallAmount = 0
+    def __init__(self, numOfPlayers, initalChipCount, smallBlind):
+        self.bettingEngine = BettingEngine(numOfPlayers * initialChipCount, smallBlind)
+        self.smallBlindBettor = 0
         self.players = []
-        self.activePlayers = []
-        self.currentActivePlayerBets = {}
-        for i in range(numOfPlayers):
+        for i in range(1, numOfPlayers + 1):
             self.players.append(Player(i, initalChipCount))
 
     def begin(self):
-        while self.determineWinner() < 1:
-            self.playHand()
+        while not self.winnerDetermined(self.bettingEngine.prizePool):
+            self.playHand(self.players, self.bettingEngine)
         print('Player {} wins!'.format(self.determineWinner()))
 
-    def playHand(self):
-        self.deck.resetDeck()
-        self.resetActivePlayers()
-        self.dealHand()
-        self.takeBets()
+    def playHand(self, players, bettingEngine):
+        field = []
+        deck = generateDeck()
+
+        smallBlindBettor = self.getSmallBlindBettor(players)
+        bigBlindBettor = self.getBigBlindBettor(players)
+        bettingEngine.collectBlinds(smallBlindBettor, bigBlindBettor)
+
+        self.dealHand(deck, players)
+        self.takeBets(self.getActivePlayers(players), bettingEngine)
+
+        #burn card
+        drawCard(deck)
+        for i in range(3):
+            field.append(drawCard(deck))
+        print('the field is: ')
+        print(field)
+
+        bettingEngine.resetActivePlayerBets()
+        bettingEngine.resetCallAmount()
+        self.takeBets(self.getActivePlayers(players), bettingEngine)
+
+        #burn card
+        drawCard(deck)
+        turnCard = drawCard(deck)
+        field.append(turnCard)
+        print('the field is: ')
+        print(field)
+
+        bettingEngine.resetActivePlayerBets()
+        bettingEngine.resetCallAmount()
+        self.takeBets(self.getActivePlayers(players), bettingEngine)
+
+        #burn card
+        drawCard(deck)
+        riverCard = drawCard(deck)
+        field.append(riverCard)
+        print('the field is: ')
+        print(field)
+
+        bettingEngine.resetActivePlayerBets()
+        bettingEngine.resetCallAmount()
+        self.takeBets(self.getActivePlayers(players), bettingEngine)
+
+        #handWinner = determineHandWinner(bettingEngine.getActivePlayers(players), field)
+        #handWinner.receiveWinnings(bettingEngine.pot)
+
+        self.incrementSmallBlindBettor(players)
+        bettingEngine.resetPot()
+        for player in players:
+            player.resetHand()
     
-    def dealHand(self):
-        for i in range(5):
-            for player in self.activePlayers:
-                player.receiveCard(self.deck.drawCard())
+    def getSmallBlindBettor(self, players):
+        return players[self.smallBlindBettor]
+
+    def getBigBlindBettor(self, players):
+        index = self.smallBlindBettor + 1
+        if index == len(players):
+            index = 0
+
+        while players[index].chipCount == 0:
+            index += 1
+            if index == len(players):
+                index = 0
+
+        return players[index]
+
+    def incrementSmallBlindBettor(self, players):
+        index = self.smallBlindBettor + 1
+        if index == len(players):
+            index = 0
+
+        while players[index].chipCount == 0:
+            index += 1
+            if index == len(players):
+                index = 0
+
+        self.smallBlindBettor = index
+
+    def getActivePlayers(self, players):
+        activePlayers = []
+        for player in players:
+            if len(player.hand):
+                activePlayers.append(player)
+        return activePlayers
+   
+    def dealHand(self, deck, players):
+        for i in range(2):
+            for player in players:
+                if player.chipCount > 0:
+                    player.receiveCard(drawCard(deck))
         for player in self.players:
-            print('Player {} hand is: {}\n'.format(player.number, player.hand))
+            print('Player {} hand is: {}\n'.format(player.identifier, player.hand))
 
-    def takeBets(self):
-        for player in self.activePlayers:
-            betAction = self.queryBetAction()
-            updateGameState(player, betAction)
-        while allBetsNotEqual():
-            for player in self.activePlayers:
-                betAction = self.queryBetAction()
-                updateGameState(player, betAction)
-        
-    def updateGameState(self, player, betAction):
-        if play == 'C':
-            player.bet(self.currentCallAmount)
-            self.currentPot += currentCallAmount
-            self.currentActivePlayerBets[player.number] = self.currentCallAmount 
-        elif play == 'R':
+    def takeBets(self, players, bettingEngine):
+        for player in players:
+            action = self.queryBetAction(player, bettingEngine.pot, bettingEngine.callAmount)
+            self.performBetAction(player, action, bettingEngine)
+
+        for player in bettingEngine.activePlayerBets.keys():
+            if bettingEngine.allBetsNotEqual():
+                action = self.queryBetAction(player, bettingEngine.pot, bettingEngine.callAmount)
+                self.performBetAction(player, action, bettingEngine)
+            else:
+                break
+
+    def performBetAction(self, player, action, bettingEngine):
+        if action == 'C':
+            bettingEngine.call(player)
+        elif action == 'R':
             raiseAmount = self.queryRaise()
-            currentCallAmount += raiseAmount
-            player.bet(currentCallAmount)
-            self.currentActivePlayerBets[player.number] = self.currentCallAmount
-        elif: play == 'CH':
-            self.currentActivePlayerBets[player.number] = 0
+            bettingEngine.raise_(player, raiseAmount)
+        elif action == 'CH':
+            bettingEngine.check(player)
         else:
-            self.activePlayers.remove(player)
-            del self.currentActivePlayerBets[player.number]
+            bettingEngine.fold(player)
 
-    def allBetsNotEqual():
-        if len(self.currentActivePlayerBets) == 1:
-            return false
-        bets = list(self.currentActivePlayerBets.values())
-        result = bets[0]
-        for bet in bets[1:]:
-            result = result ^ bet
-        return result != 0
-
-    def queryBetAction(self):
-        play = input('Enter F to fold, CH to check, C to call, or R to raise: ')
-        while(play != 'F' && play != 'C' && play != 'R' && play != 'CH'):
-            play = input('Enter F to fold, CH to check, C to call, or R to raise: ')
+    def queryBetAction(self, player, pot, callAmount):
+        message = ''
+        print('Current pot: {}    Call Amount: {}    Current chip count: {}'.format(pot, callAmount, player.chipCount))
+        if callAmount == 0:
+            message = 'Player {}, enter F to fold, CH to check, C to call, or R to raise: '.format(player.identifier)
+        else:
+            message = 'Player {}, enter F to fold, C to call, or R to raise: '.format(player.identifier)
+        play = input(message)
+        while(play != 'F' and play != 'C' and play != 'R' and play != 'CH'):
+            play = input(message)
         return play
 
-    def queryRaise(self);
+    def queryRaise(self):
         amount = input('Enter raise amount: ')
-        return amount
+        return int(amount)
 
-    def determineWinner(self):
+    def winnerDetermined(self, prizePool):
         for player in self.players:
-            if player.chipCount == self.prizePool:
-                return player.number
+            if player.chipCount == prizePool:
+                return player.identifier
         return 0
-
-    def resetActivePlayers(self):
-        for player in self.players:
-            if player.chipCount > 0:
-                self.activePlayers.append(player)
-        self.currentActivePlayerBets = {}
 
 numOfPlayers = input('Enter number of players: ')
 initialChipCount = input('Enter player initial chip count: ')
-instance = Game(int(numOfPlayers), int(initialChipCount))
+smallBlindAmount = input('Enter small blind amount: ')
+instance = Game(int(numOfPlayers), int(initialChipCount), int(smallBlindAmount))
 instance.begin()
